@@ -1,0 +1,7 @@
+init_config: {}
+instances:
+- community_string: if_counter
+  ip_address: 172.31.0.2
+  profile: generic-router
+  name: localhost
+  port: 1161

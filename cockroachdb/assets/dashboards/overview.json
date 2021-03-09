@@ -154,6 +154,7 @@
                 "title_size": "16",
                 "title_align": "left",
                 "autoscale": true,
+                "custom_unit": "%",
                 "precision": 2
             },
             "layout": {
@@ -507,16 +508,16 @@
                 "type": "query_value",
                 "requests": [
                     {
-                        "q": "avg:cockroachdb.capacity.total{*}/1000000000",
-                        "aggregator": "avg"
+                        "q": "sum:cockroachdb.capacity.total{*}",
+                        "aggregator": "last"
                     }
                 ],
                 "custom_links": [],
                 "title": "Total Capacity",
                 "title_size": "16",
                 "title_align": "left",
-                "autoscale": false,
-                "custom_unit": "GB"
+                "autoscale": true,
+                "precision": 1
             },
             "layout": {
                 "x": 16,
@@ -531,17 +532,16 @@
                 "type": "query_value",
                 "requests": [
                     {
-                        "q": "avg:cockroachdb.capacity.used{*}/1000000000",
-                        "aggregator": "avg"
+                        "q": "sum:cockroachdb.capacity.used{*}",
+                        "aggregator": "last"
                     }
                 ],
                 "custom_links": [],
                 "title": "Capacity Used",
                 "title_size": "16",
                 "title_align": "left",
-                "autoscale": false,
-                "custom_unit": "",
-                "precision": 2
+                "autoscale": true,
+                "precision": 1
             },
             "layout": {
                 "x": 16,

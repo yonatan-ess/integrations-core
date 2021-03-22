@@ -2,9 +2,10 @@
 # All rights reserved
 # Licensed under a 3-clause BSD style license (see LICENSE)
 import functools
+from multiprocessing import Process, Queue
 from threading import Thread
 
-_thread_by_func = {}
+_process_by_func = {}
 
 
 class TimeoutException(Exception):
@@ -17,8 +18,7 @@ class TimeoutException(Exception):
 
 class ThreadMethod(Thread):
     """
-    Deprecated: Please use multiprocessing module instead
-
+    Deprecated: Please use ProcessMethod instead
     Descendant of `Thread` class.
     Run the specified target method with the specified arguments.
     Store result and exceptions.
@@ -40,14 +40,34 @@ class ThreadMethod(Thread):
             self.exception = None
 
 
+class ProcessMethod(Process):
+    """
+    Descendant of `Process` class.
+    Run the specified target method with the specified arguments.
+    Store result and exceptions.
+    Modified from: https://code.activestate.com/recipes/440569/
+    """
+
+    def __init__(self, target, args, kwargs):
+        Process.__init__(self)
+        self.daemon = True
+        self.target, self.args, self.kwargs = target, args, kwargs
+        self.q = Queue()
+        self.start()
+
+    def run(self):
+        try:
+            self.q.put_nowait(self.target(*self.args, **self.kwargs))
+        except Exception as e:
+            self.q.put_nowait(e)
+
+
 def timeout(timeout):
     """
-    Deprecated: Please use multiprocessing module instead
-
-    A decorator to timeout a function. Decorated method calls are executed in a separate new thread
+    A decorator to timeout a function. Decorated method calls are executed in a separate new process
     with a specified timeout.
-    Also check if a thread for the same function already exists before creating a new one.
-    Note: Compatible with Windows (thread based).
+    Also checks if a process for the same function already exists before creating a new one.
+    Note: Compatible with Windows.
     """
 
     def decorator(func):
@@ -55,23 +75,20 @@ def timeout(timeout):
         def wrapper(*args, **kwargs):
             key = "{0}:{1}:{2}:{3}".format(id(func), func.__name__, args, kwargs)
 
-            if key in _thread_by_func:
-                # A thread for the same function already exists.
-                worker = _thread_by_func[key]
+            if key in _process_by_func:
+                # A process for the same function already exists.
+                worker = _process_by_func[key]
             else:
-                worker = ThreadMethod(func, args, kwargs)
-                _thread_by_func[key] = worker
+                worker = ProcessMethod(func, args, kwargs)
+                _process_by_func[key] = worker
 
             worker.join(timeout)
             if worker.is_alive():
+                worker.terminate()
                 raise TimeoutException()
 
-            del _thread_by_func[key]
-
-            if worker.exception:
-                raise worker.exception
-            else:
-                return worker.result
+            del _process_by_func[key]
+            return worker.q.get_nowait()
 
         return wrapper
 

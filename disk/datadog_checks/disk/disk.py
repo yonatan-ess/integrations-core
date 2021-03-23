@@ -13,8 +13,8 @@ from six import iteritems, string_types
 
 from datadog_checks.base import AgentCheck, ConfigurationError, is_affirmative
 from datadog_checks.base.utils.platform import Platform
+from datadog_checks.base.utils.process_timeout import TimeoutException, timeout
 from datadog_checks.base.utils.subprocess_output import SubprocessOutputEmptyError, get_subprocess_output
-from datadog_checks.base.utils.timeout import TimeoutException, timeout
 
 if platform.system() == 'Windows':
     import win32wnet

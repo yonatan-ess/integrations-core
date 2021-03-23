@@ -18,6 +18,7 @@ class TimeoutException(Exception):
 class ThreadMethod(Thread):
     """
     Deprecated: Please use process_timeout module instead
+
     Descendant of `Thread` class.
     Run the specified target method with the specified arguments.
     Store result and exceptions.
@@ -42,6 +43,7 @@ class ThreadMethod(Thread):
 def timeout(timeout):
     """
     Deprecated: Please use process_timeout module instead
+
     A decorator to timeout a function. Decorated method calls are executed in a separate new thread
     with a specified timeout.
     Also check if a thread for the same function already exists before creating a new one.

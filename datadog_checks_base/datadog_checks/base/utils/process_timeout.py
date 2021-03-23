@@ -34,7 +34,7 @@ class ProcessMethod(Process):
         try:
             return self.__result_queue.get_nowait()
         except Empty as e:
-            raise ResultNotAvailableException from e
+            raise ResultNotAvailableException
 
 def timeout(timeout):
     """

@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def dbm_instance(instance_complex):
     instance_complex['deep_database_monitoring'] = True
-    instance_complex['min_collection_interval'] = 1
     instance_complex['statement_samples'] = {
         'enabled': True,
         # set the default for tests to run sychronously to ensure we don't have orphaned threads running around
@@ -275,81 +274,29 @@ def test_statement_metrics(aggregator, dbm_instance):
     # Run the query and check a second time so statement metrics are computed from the previous run
     run_query(QUERY)
     mysql_check.check(dbm_instance)
-    for name in statements.STATEMENT_METRICS.values():
-        aggregator.assert_metric(
-            name,
-            tags=tags.SC_TAGS
-            + [
-                'query:{}'.format(QUERY_DIGEST_TEXT),
-                'query_signature:{}'.format(QUERY_SIGNATURE),
-                'digest:{}'.format(QUERY_DIGEST),
-            ],
-            count=1,
-        )
 
+    events = aggregator.get_event_platform_events("dbm-metrics")
+    assert len(events) == 1
+    event = events[0]
 
-def test_generate_synthetic_rows():
-    rows = [
-        {
-            'count': 45,
-            'errors': 1,
-            'time': 1134,
-            'select_scan': 100,
-            'select_full_join': 98,
-            'no_index_used': 54,
-            'no_good_index_used': 12,
-            'lock_time': 1500,
-            'rows_affected': 10,
-            'rows_sent': 20,
-            'rows_examined': 50,
-        },
-        {
-            'count': 0,
-            'errors': 0,
-            'time': 0,
-            'select_scan': 0,
-            'select_full_join': 0,
-            'no_index_used': 0,
-            'no_good_index_used': 0,
-            'lock_time': 0,
-            'rows_affected': 0,
-            'rows_sent': 0,
-            'rows_examined': 0,
-        },
-    ]
-    result = statements.generate_synthetic_rows(rows)
-    assert result == [
-        {
-            'avg_time': 25.2,
-            'count': 45,
-            'errors': 1,
-            'time': 1134,
-            'select_scan': 100,
-            'select_full_join': 98,
-            'no_index_used': 54,
-            'no_good_index_used': 12,
-            'lock_time': 1500,
-            'rows_affected': 10,
-            'rows_sent': 20,
-            'rows_sent_ratio': 0.4,
-            'rows_examined': 50,
-        },
-        {
-            'avg_time': 0,
-            'count': 0,
-            'errors': 0,
-            'time': 0,
-            'select_scan': 0,
-            'select_full_join': 0,
-            'no_index_used': 0,
-            'no_good_index_used': 0,
-            'lock_time': 0,
-            'rows_affected': 0,
-            'rows_sent': 0,
-            'rows_sent_ratio': 0,
-            'rows_examined': 0,
-        },
-    ]
+    assert event['host'] == 'stubbed.hostname'
+    assert event['timestamp'] > 0
+    assert event['min_collection_interval'] == 15
+    assert set(event['tags']) == set(
+        tags.METRIC_TAGS + ['server:{}'.format(common.HOST), 'port:{}'.format(common.PORT)]
+    )
+
+    matching_rows = [r for r in event['mysql_rows'] if r['query_signature'] == QUERY_SIGNATURE]
+    assert len(matching_rows) == 1
+    row = matching_rows[0]
+
+    assert row['digest'] == QUERY_DIGEST
+    assert row['schema_name'] is None
+    assert row['digest_text'].strip() == QUERY_DIGEST_TEXT.strip()
+    assert row['query_signature'] == QUERY_SIGNATURE
+
+    for col in statements.METRICS_COLUMNS:
+        assert type(row[col]) in (float, int)
 
 
 @pytest.mark.integration

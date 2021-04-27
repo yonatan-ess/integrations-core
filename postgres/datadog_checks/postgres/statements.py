@@ -27,8 +27,8 @@ SELECT {cols}
          ON pg_stat_statements.userid = pg_roles.oid
   LEFT JOIN pg_database
          ON pg_stat_statements.dbid = pg_database.oid
-  WHERE pg_database.datname = %s
-  AND query != '<insufficient privilege>'
+  WHERE query != '<insufficient privilege>'
+  {filters}
   LIMIT {limit}
 """
 
@@ -115,6 +115,7 @@ class PostgresStatementMetrics(object):
 
     def _execute_query(self, cursor, query, params=()):
         try:
+            self.log.debug("Running query [%s] %s", query, params)
             cursor.execute(query, params)
             return cursor.fetchall()
         except (psycopg2.ProgrammingError, psycopg2.errors.QueryCanceled) as e:
@@ -129,13 +130,11 @@ class PostgresStatementMetrics(object):
         """
         # Querying over '*' with limit 0 allows fetching only the column names from the cursor without data
         query = STATEMENTS_QUERY.format(
-            cols='*',
-            pg_stat_statements_view=self.config.pg_stat_statements_view,
-            limit=0,
+            cols='*', pg_stat_statements_view=self.config.pg_stat_statements_view, limit=0, filters=""
         )
         cursor = db.cursor()
         self._execute_query(cursor, query, params=(self.config.dbname,))
-        colnames = [desc[0] for desc in cursor.description]
+        colnames = [desc[0] for desc in cursor.description] if cursor.description else None
         return colnames
 
     def collect_per_statement_metrics(self, db):
@@ -164,14 +163,20 @@ class PostgresStatementMetrics(object):
             + list(PG_STAT_STATEMENTS_TAG_COLUMNS.keys())
         )
         query_columns = list(set(desired_columns) & set(available_columns) | set(PG_STAT_STATEMENTS_TAG_COLUMNS.keys()))
+        params = ()
+        filters = ""
+        if self.config.dbstrict:
+            filters = "AND pg_database.datname = %s"
+            params = (self.config.dbname,)
         rows = self._execute_query(
             db.cursor(cursor_factory=psycopg2.extras.DictCursor),
             STATEMENTS_QUERY.format(
                 cols=', '.join(query_columns),
                 pg_stat_statements_view=self.config.pg_stat_statements_view,
+                filters=filters,
                 limit=DEFAULT_STATEMENTS_LIMIT,
             ),
-            params=(self.config.dbname,),
+            params=params,
         )
         if not rows:
             return metrics
@@ -230,7 +235,8 @@ class PostgresStatementMetrics(object):
             try:
                 obfuscated_statement = datadog_agent.obfuscate_sql(row['query'])
             except Exception as e:
-                self.log.warning("Failed to obfuscate query '%s': %s", row['query'], e)
+                # obfuscation errors are relatively common so only log them during debugging
+                self.log.debug("Failed to obfuscate query '%s': %s", row['query'], e)
                 continue
 
             normalized_row['query'] = obfuscated_statement

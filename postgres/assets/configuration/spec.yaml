@@ -48,7 +48,7 @@ files:
         example: false
     - name: ignore_databases
       description: |
-        A list of database to ignore. No metrics metrics nor statement samples will be collected for these databases.
+        A list of database to ignore. No metrics metrics or statement samples will be collected for these databases.
         Each value can be a plain string or a postgres pattern.
         For more information on how patterns work, see https://www.postgresql.org/docs/12/functions-matching.html
       value:

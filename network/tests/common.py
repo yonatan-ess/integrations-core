@@ -2,6 +2,7 @@
 # All rights reserved
 # Licensed under Simplified BSD License (see LICENSE)
 from datadog_checks.dev import get_here
+from datadog_checks.dev.docker import using_windows_containers
 
 HERE = get_here()
 SERVICE_CHECK_NAME = "network"
@@ -10,9 +11,14 @@ INSTANCE = {"collect_connection_state": True}
 
 INSTANCE_BLACKLIST = {"collect_connection_state": True, "blacklist_conntrack_metrics": ["count"]}
 
-
-# In order to collect connection state we need `ss` command included in `iproute2` package
-E2E_METADATA = {'start_commands': ['apt-get update', 'apt-get install iproute2 -y']}
+if using_windows_containers():
+    E2E_METADATA = {'docker_platform': 'windows'}
+else:
+    E2E_METADATA = {
+        'docker_platform': 'linux',
+        # In order to collect connection state we need `ss` command included in `iproute2` package
+        'start_commands': ['apt-get update', 'apt-get install iproute2 -y'],
+    }
 
 EXPECTED_METRICS = [
     'system.net.bytes_rcvd',
